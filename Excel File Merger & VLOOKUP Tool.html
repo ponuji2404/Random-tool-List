@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SheetMerge Pro — Client-Side Excel Merger</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS (xlsx) Library via CDN -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom subtle scrollbar for tables and checklists */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .drop-zone-active {
+            border-color: #059669 !important;
+            background-color: #ecfdf5 !important;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-brand-600 text-white p-2 rounded-xl shadow-sm flex items-center justify-center">
+                    <!-- Spreadsheet Merge Icon -->
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                        SheetMerge Pro
+                        <span class="text-xs font-medium bg-brand-50 text-brand-700 border border-brand-200 px-2 py-0.5 rounded-full">100% Client-Side</span>
+                    </h1>
+                    <p class="text-xs text-slate-500 hidden sm:block">Merge & VLOOKUP Excel spreadsheets securely in your browser</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button id="loadSampleBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                    </svg>
+                    <span>Load Sample Data</span>
+                </button>
+                <button id="resetAllBtn" type="button" class="hidden inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium text-slate-600 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span class="hidden sm:inline">Reset</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notification Toast Banner (Replaces alert) -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- Privacy / Security Micro-Banner -->
+        <div class="bg-slate-900 text-slate-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm shadow-sm">
+            <div class="flex items-center gap-2.5">
+                <svg class="w-5 h-5 text-brand-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                </svg>
+                <span><strong>Zero Server Uploads:</strong> All Excel parsing and merging occurs locally in your browser memory. Your spreadsheets never leave your device.</span>
+            </div>
+            <span class="text-slate-400 font-mono text-xs shrink-0">Supports .xlsx, .xls, .csv</span>
+        </div>
+
+        <!-- STEP 1: FILE UPLOAD SECTION -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-brand-600 text-white font-bold text-sm flex items-center justify-center shadow-xs">1</span>
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">Upload Excel Spreadsheets</h2>
+                        <p class="text-xs text-slate-500">Select your base spreadsheet and the secondary lookup file containing columns to append.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- PRIMARY FILE UPLOAD CARD -->
+                <div class="flex flex-col">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-700"></span>
+                            Primary Excel File (Base File)
+                        </label>
+                        <span class="text-xs text-slate-400 font-medium">Left Table</span>
+                    </div>
+
+                    <!-- Dropzone 1 -->
+                    <div id="dropZone1" class="relative border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-brand-500 hover:bg-slate-50/80 transition cursor-pointer flex flex-col items-center justify-center min-h-[175px]">
+                        <input type="file" id="fileInput1" accept=".xlsx,.xls,.csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label="Upload Primary Excel File">
+                        <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                        </div>
+                        <p class="text-sm font-medium text-slate-700">Drag & drop your Primary file here, or <span class="text-brand-600 underline">browse</span></p>
+                        <p class="text-xs text-slate-400 mt-1">All rows in this file will be preserved by default</p>
+                    </div>
+
+                    <!-- Loaded File 1 Metadata Card -->
+                    <div id="fileInfo1" class="hidden border border-slate-200 bg-slate-50 rounded-xl p-4 space-y-3 animate-fade-in">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 font-bold text-xs">
+                                    XLSX
+                                </div>
+                                <div class="min-w-0">
+                                    <p id="fileName1" class="text-sm font-semibold text-slate-900 truncate">employees_base.xlsx</p>
+                                    <p id="fileStats1" class="text-xs text-slate-500 font-mono mt-0.5">0 rows • 0 columns</p>
+                                </div>
+                            </div>
+                            <button type="button" id="replaceFile1Btn" class="text-xs font-medium text-slate-500 hover:text-slate-800 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-2xs transition cursor-pointer shrink-0">
+                                Change File
+                            </button>
+                        </div>
+
+                        <!-- Sheet Selector 1 -->
+                        <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-3">
+                            <label for="sheetSelect1" class="text-xs font-medium text-slate-600 shrink-0">Active Sheet:</label>
+                            <select id="sheetSelect1" class="w-full max-w-[240px] text-xs font-medium bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECONDARY FILE UPLOAD CARD -->
+                <div class="flex flex-col">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-brand-500"></span>
+                            Secondary Excel File (Lookup / Source File)
+                        </label>
+                        <span class="text-xs text-brand-600 font-medium">Right Table</span>
+                    </div>
+
+                    <!-- Dropzone 2 -->
+                    <div id="dropZone2" class="relative border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-brand-500 hover:bg-slate-50/80 transition cursor-pointer flex flex-col items-center justify-center min-h-[175px]">
+                        <input type="file" id="fileInput2" accept=".xlsx,.xls,.csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" aria-label="Upload Secondary Excel File">
+                        <div class="w-12 h-12 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mb-3">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <p class="text-sm font-medium text-slate-700">Drag & drop your Secondary file here, or <span class="text-brand-600 underline">browse</span></p>
+                        <p class="text-xs text-slate-400 mt-1">Columns from this file will be matched & added to Primary</p>
+                    </div>
+
+                    <!-- Loaded File 2 Metadata Card -->
+                    <div id="fileInfo2" class="hidden border border-brand-200 bg-brand-50/40 rounded-xl p-4 space-y-3 animate-fade-in">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-10 h-10 rounded-lg bg-brand-600 text-white flex items-center justify-center shrink-0 font-bold text-xs">
+                                    XLSX
+                                </div>
+                                <div class="min-w-0">
+                                    <p id="fileName2" class="text-sm font-semibold text-slate-900 truncate">department_details.xlsx</p>
+                                    <p id="fileStats2" class="text-xs text-slate-500 font-mono mt-0.5">0 rows • 0 columns</p>
+                                </div>
+                            </div>
+                            <button type="button" id="replaceFile2Btn" class="text-xs font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-2xs transition cursor-pointer shrink-0">
+                                Change File
+                            </button>
+                        </div>
+
+                        <!-- Sheet Selector 2 -->
+                        <div class="pt-2 border-t border-brand-200/60 flex items-center justify-between gap-3">
+                            <label for="sheetSelect2" class="text-xs font-medium text-slate-700 shrink-0">Active Sheet:</label>
+                            <select id="sheetSelect2" class="w-full max-w-[240px] text-xs font-medium bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- EMPTY STATE PLACEHOLDER WHEN FILES AREN'T BOTH LOADED -->
+        <div id="emptyStatePrompt" class="bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center">
+            <div class="max-w-md mx-auto space-y-3">
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                    </svg>
+                </div>
+                <h3 class="text-base font-semibold text-slate-800">Upload both Excel files to configure your merge</h3>
+                <p class="text-sm text-slate-500">Once both the Primary and Secondary spreadsheets are loaded, you can choose the matching key columns and select which fields to bring over.</p>
+                <div class="pt-2">
+                    <button type="button" id="emptyStateSampleBtn" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-xl transition cursor-pointer">
+                        Try with Sample Employee & Payroll Sheets
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2: MERGE CONFIGURATION SECTION (HIDDEN UNTIL BOTH FILES LOADED) -->
+        <section id="step2Section" class="hidden bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden animate-fade-in">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-brand-600 text-white font-bold text-sm flex items-center justify-center shadow-xs">2</span>
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">Configure Match Keys & Columns to Include</h2>
+                        <p class="text-xs text-slate-500">Define how rows are matched across both spreadsheets and pick the columns to append.</p>
+                    </div>
+                </div>
+                <span id="autoMatchBadge" class="hidden text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full">
+                    ✨ Auto-detected matching key column
+                </span>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- LEFT COLUMN (5 cols): MATCH KEYS & JOIN RULES -->
+                <div class="lg:col-span-5 space-y-5">
+                    <div class="bg-slate-50 rounded-xl p-5 border border-slate-200/80 space-y-4">
+                        <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                            </svg>
+                            Match Columns (Join Keys)
+                        </h3>
+
+                        <!-- Primary Key Selector -->
+                        <div>
+                            <label for="primaryKeySelect" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                                Primary File Key Column
+                            </label>
+                            <select id="primaryKeySelect" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></select>
+                        </div>
+
+                        <!-- Visual Connector -->
+                        <div class="flex items-center justify-center">
+                            <span class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-white border border-slate-200 px-3 py-1 rounded-full shadow-2xs">
+                                <svg class="w-3.5 h-3.5 text-brand-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                </svg>
+                                Matches With
+                            </span>
+                        </div>
+
+                        <!-- Secondary Key Selector -->
+                        <div>
+                            <label for="secondaryKeySelect" class="block text-xs font-semibold text-slate-700 mb-1.5">
+                                Secondary File Key Column
+                            </label>
+                            <select id="secondaryKeySelect" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"></select>
+                        </div>
+
+                        <!-- Matching Options -->
+                        <div class="pt-3 border-t border-slate-200 space-y-2.5">
+                            <p class="text-xs font-semibold text-slate-700">Matching Behavior</p>
+                            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                                <input type="checkbox" id="caseInsensitiveCheck" checked class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <span class="text-xs text-slate-700">Case-insensitive matching <span class="text-slate-400">(e.g., "EMP-01" = "emp-01")</span></span>
+                            </label>
+                            <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                                <input type="checkbox" id="trimWhitespaceCheck" checked class="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <span class="text-xs text-slate-700">Trim leading & trailing whitespace</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Join Type Selector -->
+                    <div class="bg-slate-50 rounded-xl p-5 border border-slate-200/80 space-y-3">
+                        <h3 class="text-sm font-semibold text-slate-900">Join Type</h3>
+                        <div class="space-y-2.5">
+                            <label class="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-brand-400 transition">
+                                <input type="radio" name="joinType" value="left" checked class="mt-0.5 w-4 h-4 text-brand-600 border-slate-300 focus:ring-brand-500">
+                                <div>
+                                    <p class="text-xs font-semibold text-slate-900">Left Join (Recommended)</p>
+                                    <p class="text-xs text-slate-500 mt-0.5">Keep all rows from Primary File and add matched columns from Secondary File.</p>
+                                </div>
+                            </label>
+                            <label class="flex items-start gap-3 p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-brand-400 transition">
+                                <input type="radio" name="joinType" value="inner" class="mt-0.5 w-4 h-4 text-brand-600 border-slate-300 focus:ring-brand-500">
+                                <div>
+                                    <p class="text-xs font-semibold text-slate-900">Inner Join (Exact Matches Only)</p>
+                                    <p class="text-xs text-slate-500 mt-0.5">Keep only rows where the key exists in both Primary and Secondary files.</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN (7 cols): COLUMNS TO INCLUDE CHECKLIST -->
+                <div class="lg:col-span-7 flex flex-col">
+                    <div class="bg-slate-50 rounded-xl p-5 border border-slate-200/80 flex-1 flex flex-col">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-900">Columns to Include from Secondary File</h3>
+                                <p class="text-xs text-slate-500">Select which columns will be appended to your Primary spreadsheet.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="selectAllColsBtn" class="px-2.5 py-1.5 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg transition cursor-pointer">
+                                    Select All
+                                </button>
+                                <button type="button" id="deselectAllColsBtn" class="px-2.5 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg transition cursor-pointer">
+                                    Deselect All
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Search Filter & Counter -->
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="relative flex-1">
+                                <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                                <input type="text" id="colSearchInput" placeholder="Filter secondary columns..." class="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            </div>
+                            <span id="selectedColsCountBadge" class="text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2 rounded-lg shrink-0">
+                                0 selected
+                            </span>
+                        </div>
+
+                        <!-- Scrollable Column Checklist -->
+                        <div id="secondaryColsChecklist" class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-y-auto max-h-[320px] flex-1">
+                            <!-- Dynamically populated checkboxes -->
+                        </div>
+
+                        <!-- Duplicate Name Info Note -->
+                        <div id="renameNotice" class="hidden mt-3 flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                            <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Columns marked with <strong class="font-mono">_merged</strong> already exist in your Primary file and will be automatically renamed to prevent overwriting.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 3: LIVE PREVIEW, SUMMARY STATS & EXPORT (HIDDEN UNTIL BOTH FILES LOADED) -->
+        <section id="step3Section" class="hidden bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden animate-fade-in">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-full bg-brand-600 text-white font-bold text-sm flex items-center justify-center shadow-xs">3</span>
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">Live Preview & Export Merged File</h2>
+                        <p class="text-xs text-slate-500">Verify matched rows and newly appended columns before downloading your Excel file.</p>
+                    </div>
+                </div>
+
+                <!-- Export Controls -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <div class="flex items-center bg-white border border-slate-300 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-500">
+                        <input type="text" id="outputFileNameInput" value="merged_output" aria-label="Output filename" class="px-3 py-2 text-xs sm:text-sm font-medium text-slate-800 focus:outline-none w-40 sm:w-48">
+                        <span class="px-2.5 py-2 text-xs font-mono text-slate-500 bg-slate-100 border-l border-slate-200 select-none">.xlsx</span>
+                    </div>
+
+                    <button id="downloadExcelBtn" type="button" class="inline-flex items-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 active:bg-brand-800 rounded-xl shadow-sm transition cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        <span>Download Merged Excel (.xlsx)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Merge Summary Stats Bar -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 border-b border-slate-200 bg-white">
+                <div class="p-4 sm:px-6">
+                    <p class="text-xs font-medium text-slate-500">Total Primary Rows</p>
+                    <p id="statTotalPrimary" class="text-xl font-bold text-slate-900 mt-1 font-mono">0</p>
+                </div>
+                <div class="p-4 sm:px-6">
+                    <p class="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        Matched Rows
+                    </p>
+                    <div class="flex items-baseline gap-2 mt-1">
+                        <p id="statMatchedRows" class="text-xl font-bold text-emerald-600 font-mono">0</p>
+                        <span id="statMatchRate" class="text-xs font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">0%</span>
+                    </div>
+                </div>
+                <div class="p-4 sm:px-6">
+                    <p class="text-xs font-medium text-slate-500 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        Unmatched Primary Rows
+                    </p>
+                    <p id="statUnmatchedRows" class="text-xl font-bold text-slate-700 mt-1 font-mono">0</p>
+                </div>
+                <div class="p-4 sm:px-6">
+                    <p class="text-xs font-medium text-slate-500">Total Output Columns</p>
+                    <div class="flex items-baseline gap-2 mt-1">
+                        <p id="statTotalCols" class="text-xl font-bold text-slate-900 font-mono">0</p>
+                        <span id="statAddedColsBadge" class="text-xs font-medium text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded">+0 added</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Table Legend & Info -->
+            <div class="px-6 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                <div class="flex items-center gap-4">
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded-xs bg-slate-200 border border-slate-300 inline-block"></span>
+                        Primary File Columns
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded-xs bg-brand-100 border border-brand-300 inline-block"></span>
+                        <strong class="text-brand-800">Merged Columns</strong> (from Secondary File)
+                    </span>
+                </div>
+                <span id="previewRowLimitLabel" class="font-medium text-slate-500">Showing first 25 rows</span>
+            </div>
+
+            <!-- Responsive Preview Table Container -->
+            <div class="overflow-x-auto max-h-[480px]">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead id="previewTableHead" class="sticky top-0 z-10 shadow-2xs">
+                        <!-- Dynamically generated header -->
+                    </thead>
+                    <tbody id="previewTableBody" class="divide-y divide-slate-200 bg-white">
+                        <!-- Dynamically generated rows -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-5 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+            <p>SheetMerge Pro • Client-Side Spreadsheet Merger powered by SheetJS</p>
+            <p>Tip: Duplicate keys in the Secondary file match the first occurrence (standard VLOOKUP behavior).</p>
+        </div>
+    </footer>
+
+    <!-- Application Logic -->
+    <script>
+        (function () {
+            'use strict';
+
+            // =========================================================================
+            // APPLICATION STATE
+            // =========================================================================
+            const state = {
+                file1: {
+                    workbook: null,
+                    fileName: '',
+                    sheetNames: [],
+                    activeSheet: '',
+                    headers: [],
+                    rows: []
+                },
+                file2: {
+                    workbook: null,
+                    fileName: '',
+                    sheetNames: [],
+                    activeSheet: '',
+                    headers: [],
+                    rows: []
+                },
+                config: {
+                    primaryKey: '',
+                    secondaryKey: '',
+                    caseInsensitive: true,
+                    trimWhitespace: true,
+                    joinType: 'left', // 'left' | 'inner'
+                    selectedSecondaryCols: new Set(),
+                    columnSearchFilter: ''
+                },
+                mergedResult: {
+                    headers: [], // Array of { key, label, isMerged, originalName }
+                    rows: [],    // Array of plain objects keyed by output column header
+                    stats: {
+                        totalPrimary: 0,
+                        matched: 0,
+                        unmatched: 0,
+                        totalCols: 0,
+                        addedCols: 0
+                    }
+                }
+            };
+
+            // =========================================================================
+            // DOM ELEMENTS CACHE
+            // =========================================================================
+            const dom = {
+                loadSampleBtn: document.getElementById('loadSampleBtn'),
+                emptyStateSampleBtn: document.getElementById('emptyStateSampleBtn'),
+                resetAllBtn: document.getElementById('resetAllBtn'),
+                toastContainer: document.getElementById('toastContainer'),
+
+                // File 1
+                dropZone1: document.getElementById('dropZone1'),
+                fileInput1: document.getElementById('fileInput1'),
+                fileInfo1: document.getElementById('fileInfo1'),
+                fileName1: document.getElementById('fileName1'),
+                fileStats1: document.getElementById('fileStats1'),
+                sheetSelect1: document.getElementById('sheetSelect1'),
+                replaceFile1Btn: document.getElementById('replaceFile1Btn'),
+
+                // File 2
+                dropZone2: document.getElementById('dropZone2'),
+                fileInput2: document.getElementById('fileInput2'),
+                fileInfo2: document.getElementById('fileInfo2'),
+                fileName2: document.getElementById('fileName2'),
+                fileStats2: document.getElementById('fileStats2'),
+                sheetSelect2: document.getElementById('sheetSelect2'),
+                replaceFile2Btn: document.getElementById('replaceFile2Btn'),
+
+                // Sections
+                emptyStatePrompt: document.getElementById('emptyStatePrompt'),
+                step2Section: document.getElementById('step2Section'),
+                step3Section: document.getElementById('step3Section'),
+
+                // Step 2 Config
+                autoMatchBadge: document.getElementById('autoMatchBadge'),
+                primaryKeySelect: document.getElementById('primaryKeySelect'),
+                secondaryKeySelect: document.getElementById('secondaryKeySelect'),
+                caseInsensitiveCheck: document.getElementById('caseInsensitiveCheck'),
+                trimWhitespaceCheck: document.getElementById('trimWhitespaceCheck'),
+                joinTypeRadios: document.querySelectorAll('input[name="joinType"]'),
+                selectAllColsBtn: document.getElementById('selectAllColsBtn'),
+                deselectAllColsBtn: document.getElementById('deselectAllColsBtn'),
+                colSearchInput: document.getElementById('colSearchInput'),
+                selectedColsCountBadge: document.getElementById('selectedColsCountBadge'),
+                secondaryColsChecklist: document.getElementById('secondaryColsChecklist'),
+                renameNotice: document.getElementById('renameNotice'),
+
+                // Step 3 Preview & Export
+                outputFileNameInput: document.getElementById('outputFileNameInput'),
+                downloadExcelBtn: document.getElementById('downloadExcelBtn'),
+                statTotalPrimary: document.getElementById('statTotalPrimary'),
+                statMatchedRows: document.getElementById('statMatchedRows'),
+                statMatchRate: document.getElementById('statMatchRate'),
+                statUnmatchedRows: document.getElementById('statUnmatchedRows'),
+                statTotalCols: document.getElementById('statTotalCols'),
+                statAddedColsBadge: document.getElementById('statAddedColsBadge'),
+                previewRowLimitLabel: document.getElementById('previewRowLimitLabel'),
+                previewTableHead: document.getElementById('previewTableHead'),
+                previewTableBody: document.getElementById('previewTableBody')
+            };
+
+            // =========================================================================
+            // TOAST NOTIFICATION SYSTEM (No alert())
+            // =========================================================================
+            function showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                const styles = {
+                    info: 'bg-slate-900 text-white border-slate-700',
+                    success: 'bg-emerald-900 text-white border-emerald-700',
+                    error: 'bg-rose-900 text-white border-rose-700'
+                };
+                toast.className = `pointer-events-auto px-4 py-3 rounded-xl border shadow-lg text-xs sm:text-sm font-medium flex items-center justify-between gap-3 animate-fade-in ${styles[type] || styles.info}`;
+                
+                const textSpan = document.createElement('span');
+                textSpan.textContent = message;
+                toast.appendChild(textSpan);
+
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '&times;';
+                closeBtn.className = 'text-lg leading-none opacity-70 hover:opacity-100 cursor-pointer';
+                closeBtn.onclick = () => toast.remove();
+                toast.appendChild(closeBtn);
+
+                dom.toastContainer.appendChild(toast);
+                setTimeout(() => {
+                    if (toast.parentNode) toast.remove();
+                }, 4200);
+            }
+
+            // =========================================================================
+            // EXCEL PARSING & WORKBOOK HELPERS
+            // =========================================================================
+            function parseSheetData(workbook, sheetName) {
+                const worksheet = workbook.Sheets[sheetName];
+                if (!worksheet) return { headers: [], rows: [] };
+
+                // Convert sheet to 2D array first so we can cleanly extract & deduplicate headers
+                const rawMatrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+                if (!rawMatrix || rawMatrix.length === 0) {
+                    return { headers: [], rows: [] };
+                }
+
+                // Extract headers from first non-empty row
+                const rawHeaders = rawMatrix[0].map((cell, idx) => {
+                    const str = String(cell ?? '').trim();
+                    return str || `Column_${idx + 1}`;
+                });
+
+                // Ensure unique header names within the same sheet
+                const seenHeaders = new Map();
+                const headers = rawHeaders.map((h) => {
+                    if (!seenHeaders.has(h)) {
+                        seenHeaders.set(h, 1);
+                        return h;
+                    }
+                    const count = seenHeaders.get(h) + 1;
+                    seenHeaders.set(h, count);
+                    return `${h}_${count}`;
+                });
+
+                // Build row objects
+                const rows = [];
+                for (let r = 1; r < rawMatrix.length; r++) {
+                    const rowArr = rawMatrix[r];
+                    // Skip completely blank trailing rows
+                    const isEmptyRow = rowArr.every((val) => val === '' || val === null || val === undefined);
+                    if (isEmptyRow) continue;
+
+                    const rowObj = {};
+                    headers.forEach((header, colIdx) => {
+                        rowObj[header] = rowArr[colIdx] !== undefined ? rowArr[colIdx] : '';
+                    });
+                    rows.push(rowObj);
+                }
+
+                return { headers, rows };
+            }
+
+            function handleFileUpload(file, fileIndex) {
+                if (!file) return;
+                const validExtensions = ['.xlsx', '.xls', '.csv'];
+                const lowerName = file.name.toLowerCase();
+                if (!validExtensions.some((ext) => lowerName.endsWith(ext))) {
+                    showToast('Please upload a valid .xlsx, .xls, or .csv file.', 'error');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+
+                        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                            showToast('The uploaded workbook contains no sheets.', 'error');
+                            return;
+                        }
+
+                        const targetState = fileIndex === 1 ? state.file1 : state.file2;
+                        targetState.workbook = workbook;
+                        targetState.fileName = file.name;
+                        targetState.sheetNames = workbook.SheetNames;
+                        targetState.activeSheet = workbook.SheetNames[0];
+
+                        const parsed = parseSheetData(workbook, targetState.activeSheet);
+                        targetState.headers = parsed.headers;
+                        targetState.rows = parsed.rows;
+
+                        if (targetState.headers.length === 0) {
+                            showToast(`Sheet "${targetState.activeSheet}" appears to be empty.`, 'error');
+                        } else {
+                            showToast(`Loaded "${file.name}" (${parsed.rows.length} rows)`, 'success');
+                        }
+
+                        updateFileCardUI(fileIndex);
+                        onFilesUpdated();
+                    } catch (err) {
+                        console.error(err);
+                        showToast('Failed to parse spreadsheet. Ensure the file is not password-protected or corrupted.', 'error');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function switchActiveSheet(fileIndex, newSheetName) {
+                const targetState = fileIndex === 1 ? state.file1 : state.file2;
+                if (!targetState.workbook) return;
+
+                targetState.activeSheet = newSheetName;
+                const parsed = parseSheetData(targetState.workbook, newSheetName);
+                targetState.headers = parsed.headers;
+                targetState.rows = parsed.rows;
+
+                updateFileCardUI(fileIndex);
+                onFilesUpdated();
+            }
+
+            function updateFileCardUI(fileIndex) {
+                const targetState = fileIndex === 1 ? state.file1 : state.file2;
+                const dropZone = fileIndex === 1 ? dom.dropZone1 : dom.dropZone2;
+                const fileInfo = fileIndex === 1 ? dom.fileInfo1 : dom.fileInfo2;
+                const fileNameEl = fileIndex === 1 ? dom.fileName1 : dom.fileName2;
+                const fileStatsEl = fileIndex === 1 ? dom.fileStats1 : dom.fileStats2;
+                const sheetSelect = fileIndex === 1 ? dom.sheetSelect1 : dom.sheetSelect2;
+
+                if (!targetState.workbook) {
+                    dropZone.classList.remove('hidden');
+                    fileInfo.classList.add('hidden');
+                    return;
+                }
+
+                dropZone.classList.add('hidden');
+                fileInfo.classList.remove('hidden');
+                dom.resetAllBtn.classList.remove('hidden');
+
+                fileNameEl.textContent = targetState.fileName;
+                fileStatsEl.textContent = `${targetState.rows.length.toLocaleString()} rows • ${targetState.headers.length} columns`;
+
+                // Populate sheet selector
+                sheetSelect.innerHTML = '';
+                targetState.sheetNames.forEach((name) => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    if (name === targetState.activeSheet) opt.selected = true;
+                    sheetSelect.appendChild(opt);
+                });
+            }
+
+            // =========================================================================
+            // CONFIGURATION & AUTO-MATCHING LOGIC
+            // =========================================================================
+            function onFilesUpdated() {
+                const bothLoaded = state.file1.workbook !== null && state.file2.workbook !== null;
+
+                if (!bothLoaded) {
+                    dom.emptyStatePrompt.classList.remove('hidden');
+                    dom.step2Section.classList.add('hidden');
+                    dom.step3Section.classList.add('hidden');
+                    return;
+                }
+
+                dom.emptyStatePrompt.classList.add('hidden');
+                dom.step2Section.classList.remove('hidden');
+                dom.step3Section.classList.remove('hidden');
+
+                // Set default output filename based on primary file
+                const baseName = state.file1.fileName.replace(/\.[^/.]+$/, '');
+                dom.outputFileNameInput.value = `${baseName}_merged`;
+
+                populateKeySelectors();
+                initializeSecondaryColumnsSelection();
+                renderSecondaryChecklist();
+                executeMergeAndRender();
+            }
+
+            function populateKeySelectors() {
+                const h1 = state.file1.headers;
+                const h2 = state.file2.headers;
+
+                // Attempt smart auto-match on column names (case-insensitive)
+                let matchedPrimary = '';
+                let matchedSecondary = '';
+                let autoMatched = false;
+
+                for (const col1 of h1) {
+                    const found = h2.find((col2) => col2.trim().toLowerCase() === col1.trim().toLowerCase());
+                    if (found) {
+                        matchedPrimary = col1;
+                        matchedSecondary = found;
+                        autoMatched = true;
+                        break;
+                    }
+                }
+
+                state.config.primaryKey = matchedPrimary || h1[0] || '';
+                state.config.secondaryKey = matchedSecondary || h2[0] || '';
+
+                if (autoMatched) {
+                    dom.autoMatchBadge.classList.remove('hidden');
+                } else {
+                    dom.autoMatchBadge.classList.add('hidden');
+                }
+
+                // Populate Primary Key dropdown
+                dom.primaryKeySelect.innerHTML = '';
+                h1.forEach((col) => {
+                    const opt = document.createElement('option');
+                    opt.value = col;
+                    opt.textContent = col;
+                    if (col === state.config.primaryKey) opt.selected = true;
+                    dom.primaryKeySelect.appendChild(opt);
+                });
+
+                // Populate Secondary Key dropdown
+                dom.secondaryKeySelect.innerHTML = '';
+                h2.forEach((col) => {
+                    const opt = document.createElement('option');
+                    opt.value = col;
+                    opt.textContent = col;
+                    if (col === state.config.secondaryKey) opt.selected = true;
+                    dom.secondaryKeySelect.appendChild(opt);
+                });
+            }
+
+            function initializeSecondaryColumnsSelection() {
+                // By default, select all secondary columns EXCEPT the join key column itself
+                state.config.selectedSecondaryCols.clear();
+                state.file2.headers.forEach((col) => {
+                    if (col !== state.config.secondaryKey) {
+                        state.config.selectedSecondaryCols.add(col);
+                    }
+                });
+            }
+
+            function getOutputColumnName(secCol, primaryHeadersSet) {
+                if (!primaryHeadersSet.has(secCol)) {
+                    return { finalName: secCol, wasRenamed: false };
+                }
+                let candidate = `${secCol}_merged`;
+                let counter = 2;
+                while (primaryHeadersSet.has(candidate)) {
+                    candidate = `${secCol}_merged_${counter}`;
+                    counter++;
+                }
+                return { finalName: candidate, wasRenamed: true };
+            }
+
+            function renderSecondaryChecklist() {
+                const h2 = state.file2.headers;
+                const primarySet = new Set(state.file1.headers);
+                const filter = state.config.columnSearchFilter.trim().toLowerCase();
+
+                dom.secondaryColsChecklist.innerHTML = '';
+                let hasAnyRename = false;
+                let visibleCount = 0;
+
+                h2.forEach((col) => {
+                    if (filter && !col.toLowerCase().includes(filter)) return;
+                    visibleCount++;
+
+                    const isChecked = state.config.selectedSecondaryCols.has(col);
+                    const isJoinKey = col === state.config.secondaryKey;
+                    const { finalName, wasRenamed } = getOutputColumnName(col, primarySet);
+                    if (isChecked && wasRenamed) hasAnyRename = true;
+
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 cursor-pointer transition select-none';
+
+                    const leftDiv = document.createElement('div');
+                    leftDiv.className = 'flex items-center gap-3 min-w-0';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = isChecked;
+                    checkbox.className = 'w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0';
+                    checkbox.addEventListener('change', () => {
+                        if (checkbox.checked) {
+                            state.config.selectedSecondaryCols.add(col);
+                        } else {
+                            state.config.selectedSecondaryCols.delete(col);
+                        }
+                        renderSecondaryChecklist();
+                        executeMergeAndRender();
+                    });
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'text-xs sm:text-sm font-medium text-slate-800 truncate';
+                    nameSpan.textContent = col;
+
+                    leftDiv.appendChild(checkbox);
+                    leftDiv.appendChild(nameSpan);
+
+                    // Badges on the right
+                    const badgesDiv = document.createElement('div');
+                    badgesDiv.className = 'flex items-center gap-1.5 shrink-0';
+
+                    if (isJoinKey) {
+                        const keyBadge = document.createElement('span');
+                        keyBadge.className = 'text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full';
+                        keyBadge.textContent = 'Join Key';
+                        badgesDiv.appendChild(keyBadge);
+                    }
+
+                    if (wasRenamed) {
+                        const renameBadge = document.createElement('span');
+                        renameBadge.className = 'text-[11px] font-mono font-medium bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full';
+                        renameBadge.title = `Column "${col}" already exists in Primary file. Will be added as "${finalName}".`;
+                        renameBadge.textContent = `→ ${finalName}`;
+                        badgesDiv.appendChild(renameBadge);
+                    }
+
+                    label.appendChild(leftDiv);
+                    label.appendChild(badgesDiv);
+                    dom.secondaryColsChecklist.appendChild(label);
+                });
+
+                if (visibleCount === 0) {
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.className = 'p-6 text-center text-xs text-slate-400';
+                    emptyMsg.textContent = 'No columns match your filter.';
+                    dom.secondaryColsChecklist.appendChild(emptyMsg);
+                }
+
+                // Update count badge & duplicate notice
+                const count = state.config.selectedSecondaryCols.size;
+                dom.selectedColsCountBadge.textContent = `${count} of ${h2.length} selected`;
+
+                if (hasAnyRename) {
+                    dom.renameNotice.classList.remove('hidden');
+                } else {
+                    dom.renameNotice.classList.add('hidden');
+                }
+            }
+
+            // =========================================================================
+            // CORE MERGE ENGINE (VLOOKUP / RELATIONAL JOIN)
+            // =========================================================================
+            function normalizeKey(rawVal) {
+                if (rawVal === null || rawVal === undefined) return '';
+                let str = String(rawVal);
+                if (state.config.trimWhitespace) str = str.trim();
+                if (state.config.caseInsensitive) str = str.toLowerCase();
+                return str;
+            }
+
+            function executeMergeAndRender() {
+                const pRows = state.file1.rows;
+                const sRows = state.file2.rows;
+                const pKeyCol = state.config.primaryKey;
+                const sKeyCol = state.config.secondaryKey;
+
+                // 1. Build lookup Map from Secondary File (first match wins, standard VLOOKUP)
+                const lookupMap = new Map();
+                for (let i = 0; i < sRows.length; i++) {
+                    const row = sRows[i];
+                    const normKey = normalizeKey(row[sKeyCol]);
+                    if (normKey !== '' && !lookupMap.has(normKey)) {
+                        lookupMap.set(normKey, row);
+                    }
+                }
+
+                // 2. Determine output columns metadata (preserve secondary file column order)
+                const primaryHeaders = state.file1.headers;
+                const usedNamesSet = new Set(primaryHeaders);
+                const outputColumns = primaryHeaders.map((h) => ({
+                    sourceCol: h,
+                    outputName: h,
+                    isMerged: false
+                }));
+
+                const selectedOrdered = state.file2.headers.filter((col) =>
+                    state.config.selectedSecondaryCols.has(col)
+                );
+
+                selectedOrdered.forEach((secCol) => {
+                    const { finalName } = getOutputColumnName(secCol, usedNamesSet);
+                    usedNamesSet.add(finalName);
+                    outputColumns.push({
+                        sourceCol: secCol,
+                        outputName: finalName,
+                        isMerged: true
+                    });
+                });
+
+                // 3. Perform Join across Primary Rows
+                const mergedRows = [];
+                let matchedCount = 0;
+                let unmatchedCount = 0;
+
+                for (let i = 0; i < pRows.length; i++) {
+                    const pRow = pRows[i];
+                    const normKey = normalizeKey(pRow[pKeyCol]);
+                    const matchedSecRow = normKey !== '' ? lookupMap.get(normKey) : undefined;
+                    const isMatch = matchedSecRow !== undefined;
+
+                    if (isMatch) {
+                        matchedCount++;
+                    } else {
+                        unmatchedCount++;
+                    }
+
+                    // If Inner Join, skip unmatched rows
+                    if (state.config.joinType === 'inner' && !isMatch) {
+                        continue;
+                    }
+
+                    const outRow = {};
+                    // Copy primary fields
+                    for (let c = 0; c < primaryHeaders.length; c++) {
+                        const colName = primaryHeaders[c];
+                        outRow[colName] = pRow[colName] !== undefined ? pRow[colName] : '';
+                    }
+                    // Append selected secondary fields
+                    for (let c = primaryHeaders.length; c < outputColumns.length; c++) {
+                        const colMeta = outputColumns[c];
+                        outRow[colMeta.outputName] = isMatch && matchedSecRow[colMeta.sourceCol] !== undefined
+                            ? matchedSecRow[colMeta.sourceCol]
+                            : '';
+                    }
+
+                    mergedRows.push(outRow);
+                }
+
+                // Save state
+                state.mergedResult.headers = outputColumns;
+                state.mergedResult.rows = mergedRows;
+                state.mergedResult.stats = {
+                    totalPrimary: pRows.length,
+                    matched: matchedCount,
+                    unmatched: unmatchedCount,
+                    totalCols: outputColumns.length,
+                    addedCols: selectedOrdered.length
+                };
+
+                renderSummaryAndPreview();
+            }
+
+            function renderSummaryAndPreview() {
+                const { headers, rows, stats } = state.mergedResult;
+
+                // Update summary stats
+                dom.statTotalPrimary.textContent = stats.totalPrimary.toLocaleString();
+                dom.statMatchedRows.textContent = stats.matched.toLocaleString();
+                const rate = stats.totalPrimary > 0 ? Math.round((stats.matched / stats.totalPrimary) * 100) : 0;
+                dom.statMatchRate.textContent = `${rate}%`;
+                dom.statUnmatchedRows.textContent = stats.unmatched.toLocaleString();
+                dom.statTotalCols.textContent = stats.totalCols.toLocaleString();
+                dom.statAddedColsBadge.textContent = `+${stats.addedCols} added`;
+
+                // Render Table Header
+                dom.previewTableHead.innerHTML = '';
+                const headTr = document.createElement('tr');
+
+                // Row # index column
+                const idxTh = document.createElement('th');
+                idxTh.className = 'px-3 py-2.5 bg-slate-100 text-slate-500 font-mono font-medium border-b border-r border-slate-200 w-12 text-center';
+                idxTh.textContent = '#';
+                headTr.appendChild(idxTh);
+
+                headers.forEach((colMeta) => {
+                    const th = document.createElement('th');
+                    if (colMeta.isMerged) {
+                        th.className = 'px-3.5 py-2.5 bg-brand-50 text-brand-900 font-semibold border-b border-r border-brand-200 whitespace-nowrap';
+                        th.innerHTML = `
+                            <div class="flex items-center gap-1.5">
+                                <span>${escapeHtml(colMeta.outputName)}</span>
+                                <span class="text-[10px] uppercase tracking-wider font-bold bg-brand-600 text-white px-1.5 py-0.2 rounded">Added</span>
+                            </div>
+                        `;
+                    } else {
+                        const isKey = colMeta.outputName === state.config.primaryKey;
+                        th.className = 'px-3.5 py-2.5 bg-slate-100 text-slate-700 font-semibold border-b border-r border-slate-200 whitespace-nowrap';
+                        th.innerHTML = isKey
+                            ? `<div class="flex items-center gap-1.5"><span>${escapeHtml(colMeta.outputName)}</span><span class="text-[10px] font-medium bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded">Key</span></div>`
+                            : escapeHtml(colMeta.outputName);
+                    }
+                    headTr.appendChild(th);
+                });
+                dom.previewTableHead.appendChild(headTr);
+
+                // Render First 25 Rows
+                const previewLimit = 25;
+                const slice = rows.slice(0, previewLimit);
+                dom.previewRowLimitLabel.textContent = rows.length > previewLimit
+                    ? `Showing first ${previewLimit} of ${rows.length.toLocaleString()} output rows`
+                    : `Showing all ${rows.length.toLocaleString()} output rows`;
+
+                dom.previewTableBody.innerHTML = '';
+
+                if (slice.length === 0) {
+                    const emptyTr = document.createElement('tr');
+                    const emptyTd = document.createElement('td');
+                    emptyTd.colSpan = headers.length + 1;
+                    emptyTd.className = 'px-6 py-10 text-center text-sm text-slate-500';
+                    emptyTd.textContent = 'No rows matched your current Join configuration. Try switching to Left Join or enabling Case-Insensitive matching.';
+                    emptyTr.appendChild(emptyTd);
+                    dom.previewTableBody.appendChild(emptyTr);
+                    return;
+                }
+
+                slice.forEach((rowObj, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50/90 transition-colors';
+
+                    const idxTd = document.createElement('td');
+                    idxTd.className = 'px-3 py-2 bg-slate-50/60 text-slate-400 font-mono text-center border-r border-slate-200';
+                    idxTd.textContent = idx + 1;
+                    tr.appendChild(idxTd);
+
+                    headers.forEach((colMeta) => {
+                        const td = document.createElement('td');
+                        const val = rowObj[colMeta.outputName];
+                        const isEmpty = val === '' || val === null || val === undefined;
+
+                        if (colMeta.isMerged) {
+                            td.className = `px-3.5 py-2 border-r border-slate-200 whitespace-nowrap max-w-[260px] truncate ${isEmpty ? 'bg-amber-50/30 text-slate-400 italic' : 'bg-brand-50/25 text-slate-900 font-medium'}`;
+                            td.textContent = isEmpty ? '—' : String(val);
+                        } else {
+                            td.className = 'px-3.5 py-2 border-r border-slate-200 text-slate-700 whitespace-nowrap max-w-[260px] truncate';
+                            td.textContent = isEmpty ? '' : String(val);
+                        }
+                        td.title = isEmpty ? '' : String(val);
+                        tr.appendChild(td);
+                    });
+
+                    dom.previewTableBody.appendChild(tr);
+                });
+            }
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            // =========================================================================
+            // EXPORT TO EXCEL (.XLSX)
+            // =========================================================================
+            function downloadMergedWorkbook() {
+                const { headers, rows } = state.mergedResult;
+                if (!headers.length) {
+                    showToast('Nothing to export yet.', 'error');
+                    return;
+                }
+
+                try {
+                    const headerNames = headers.map((h) => h.outputName);
+                    // Build 2D array to preserve exact column order
+                    const aoa = [headerNames];
+                    for (let i = 0; i < rows.length; i++) {
+                        const r = rows[i];
+                        aoa.push(headerNames.map((col) => (r[col] !== undefined ? r[col] : '')));
+                    }
+
+                    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+                    // Auto-size columns gently for better readability in Excel
+                    ws['!cols'] = headerNames.map((h) => ({
+                        wch: Math.min(Math.max(String(h).length + 5, 14), 36)
+                    }));
+
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Merged_Data');
+
+                    let rawName = dom.outputFileNameInput.value.trim() || 'merged_output';
+                    rawName = rawName.replace(/\.xlsx$/i, '');
+                    const finalFileName = `${rawName}.xlsx`;
+
+                    XLSX.writeFile(wb, finalFileName);
+                    showToast(`Downloaded "${finalFileName}" (${rows.length.toLocaleString()} rows)`, 'success');
+                } catch (err) {
+                    console.error(err);
+                    showToast('Error generating Excel file.', 'error');
+                }
+            }
+
+            // =========================================================================
+            // SAMPLE DATA GENERATOR (For Instant Testing)
+            // =========================================================================
+            function loadSampleData() {
+                // Sample Primary File: Sales Orders
+                const primaryData = [
+                    ['Order_ID', 'Customer_ID', 'Order_Date', 'Product_SKU', 'Quantity', 'Status'],
+                    ['ORD-1001', 'CUST-01', '2026-10-02', 'SKU-A10', 4, 'Shipped'],
+                    ['ORD-1002', 'cust-02', '2026-10-03', 'SKU-B22', 1, 'Processing'],
+                    ['ORD-1003', 'CUST-03 ', '2026-10-04', 'SKU-C05', 10, 'Shipped'],
+                    ['ORD-1004', 'CUST-04', '2026-10-05', 'SKU-A10', 2, 'Delivered'],
+                    ['ORD-1005', 'CUST-99', '2026-10-06', 'SKU-D90', 5, 'Pending'],
+                    ['ORD-1006', 'CUST-01', '2026-10-08', 'SKU-B22', 3, 'Delivered'],
+                    ['ORD-1007', 'CUST-05', '2026-10-09', 'SKU-E12', 7, 'Shipped']
+                ];
+
+                // Sample Secondary File: Customer Directory
+                const secondaryData = [
+                    ['Customer_ID', 'Customer_Name', 'Account_Tier', 'Region', 'Account_Manager', 'Status'],
+                    ['CUST-01', 'Acme Logistics Corp', 'Enterprise', 'North America', 'Priya Sharma', 'Active'],
+                    ['CUST-02', 'BlueWave Retail', 'Growth', 'Europe', 'Liam O\'Connor', 'Active'],
+                    ['CUST-03', 'Summit Healthcare', 'Enterprise', 'North America', 'Arjun Mehta', 'Active'],
+                    ['CUST-04', 'Solstice Energy', 'Mid-Market', 'APAC', 'Elena Rostova', 'Review'],
+                    ['CUST-05', 'Vertex Robotics', 'Enterprise', 'APAC', 'Priya Sharma', 'Active']
+                ];
+
+                const wb1 = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb1, XLSX.utils.aoa_to_sheet(primaryData), 'Q4_Orders');
+                XLSX.utils.book_append_sheet(wb1, XLSX.utils.aoa_to_sheet([['Notes'], ['Sample secondary tab']]), 'Notes');
+
+                const wb2 = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet(secondaryData), 'CRM_Accounts');
+
+                // Populate state 1
+                state.file1.workbook = wb1;
+                state.file1.fileName = 'Q4_Sales_Orders.xlsx';
+                state.file1.sheetNames = wb1.SheetNames;
+                state.file1.activeSheet = 'Q4_Orders';
+                const p1 = parseSheetData(wb1, 'Q4_Orders');
+                state.file1.headers = p1.headers;
+                state.file1.rows = p1.rows;
+
+                // Populate state 2
+                state.file2.workbook = wb2;
+                state.file2.fileName = 'Customer_CRM_Master.xlsx';
+                state.file2.sheetNames = wb2.SheetNames;
+                state.file2.activeSheet = 'CRM_Accounts';
+                const p2 = parseSheetData(wb2, 'CRM_Accounts');
+                state.file2.headers = p2.headers;
+                state.file2.rows = p2.rows;
+
+                updateFileCardUI(1);
+                updateFileCardUI(2);
+                onFilesUpdated();
+                showToast('Loaded sample Sales Orders & Customer CRM files!', 'success');
+            }
+
+            function resetAll() {
+                state.file1 = { workbook: null, fileName: '', sheetNames: [], activeSheet: '', headers: [], rows: [] };
+                state.file2 = { workbook: null, fileName: '', sheetNames: [], activeSheet: '', headers: [], rows: [] };
+                state.config.selectedSecondaryCols.clear();
+                state.config.columnSearchFilter = '';
+                dom.colSearchInput.value = '';
+                dom.fileInput1.value = '';
+                dom.fileInput2.value = '';
+                dom.resetAllBtn.classList.add('hidden');
+
+                updateFileCardUI(1);
+                updateFileCardUI(2);
+                onFilesUpdated();
+                showToast('Workspace reset.', 'info');
+            }
+
+            // =========================================================================
+            // DRAG & DROP + EVENT LISTENERS
+            // =========================================================================
+            function setupDropZone(dropZoneEl, fileInputEl, fileIndex) {
+                ['dragenter', 'dragover'].forEach((evtName) => {
+                    dropZoneEl.addEventListener(evtName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropZoneEl.classList.add('drop-zone-active');
+                    });
+                });
+
+                ['dragleave', 'drop'].forEach((evtName) => {
+                    dropZoneEl.addEventListener(evtName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dropZoneEl.classList.remove('drop-zone-active');
+                    });
+                });
+
+                dropZoneEl.addEventListener('drop', (e) => {
+                    const files = e.dataTransfer?.files;
+                    if (files && files.length > 0) {
+                        handleFileUpload(files[0], fileIndex);
+                    }
+                });
+
+                fileInputEl.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                        handleFileUpload(e.target.files[0], fileIndex);
+                    }
+                });
+            }
+
+            setupDropZone(dom.dropZone1, dom.fileInput1, 1);
+            setupDropZone(dom.dropZone2, dom.fileInput2, 2);
+
+            dom.replaceFile1Btn.addEventListener('click', () => dom.fileInput1.click());
+            dom.replaceFile2Btn.addEventListener('click', () => dom.fileInput2.click());
+
+            dom.sheetSelect1.addEventListener('change', (e) => switchActiveSheet(1, e.target.value));
+            dom.sheetSelect2.addEventListener('change', (e) => switchActiveSheet(2, e.target.value));
+
+            dom.loadSampleBtn.addEventListener('click', loadSampleData);
+            dom.emptyStateSampleBtn.addEventListener('click', loadSampleData);
+            dom.resetAllBtn.addEventListener('click', resetAll);
+
+            dom.primaryKeySelect.addEventListener('change', (e) => {
+                state.config.primaryKey = e.target.value;
+                executeMergeAndRender();
+            });
+
+            dom.secondaryKeySelect.addEventListener('change', (e) => {
+                const oldKey = state.config.secondaryKey;
+                const newKey = e.target.value;
+                state.config.secondaryKey = newKey;
+
+                // Automatically uncheck the newly chosen join key (and re-check old key if desired)
+                state.config.selectedSecondaryCols.delete(newKey);
+                if (oldKey && oldKey !== newKey) {
+                    state.config.selectedSecondaryCols.add(oldKey);
+                }
+
+                renderSecondaryChecklist();
+                executeMergeAndRender();
+            });
+
+            dom.caseInsensitiveCheck.addEventListener('change', (e) => {
+                state.config.caseInsensitive = e.target.checked;
+                executeMergeAndRender();
+            });
+
+            dom.trimWhitespaceCheck.addEventListener('change', (e) => {
+                state.config.trimWhitespace = e.target.checked;
+                executeMergeAndRender();
+            });
+
+            dom.joinTypeRadios.forEach((radio) => {
+                radio.addEventListener('change', (e) => {
+                    state.config.joinType = e.target.value;
+                    executeMergeAndRender();
+                });
+            });
+
+            dom.selectAllColsBtn.addEventListener('click', () => {
+                state.file2.headers.forEach((col) => state.config.selectedSecondaryCols.add(col));
+                renderSecondaryChecklist();
+                executeMergeAndRender();
+            });
+
+            dom.deselectAllColsBtn.addEventListener('click', () => {
+                state.config.selectedSecondaryCols.clear();
+                renderSecondaryChecklist();
+                executeMergeAndRender();
+            });
+
+            dom.colSearchInput.addEventListener('input', (e) => {
+                state.config.columnSearchFilter = e.target.value;
+                renderSecondaryChecklist();
+            });
+
+            dom.downloadExcelBtn.addEventListener('click', downloadMergedWorkbook);
+        })();
+    </script>
+</body>
+</html>
